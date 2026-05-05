@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Office Task Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── DESIGN TOKENS ─────────────────────────────────── */
+    :root {
+      --ink:        #0f1623;
+      --ink-soft:   #1e2a3a;
+      --ink-mid:    #2e3f55;
+      --slate:      #4a607a;
+      --mist:       #8fa3b8;
+      --fog:        #c4d2df;
+      --paper:      #edf2f7;
+      --white:      #ffffff;
+
+      --green:      #00c97a;
+      --green-dark: #008f55;
+      --green-glow: rgba(0,201,122,0.18);
+      --amber:      #f5a623;
+      --amber-bg:   rgba(245,166,35,0.12);
+      --red:        #ff4f5e;
+
+      --shift-start: #1e3a5f;
+      --shift-end:   #2d1e50;
+
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-xl: 28px;
+
+      --shadow-card: 0 2px 16px rgba(15,22,35,0.18), 0 1px 4px rgba(15,22,35,0.12);
+      --shadow-btn:  0 4px 20px rgba(0,201,122,0.35);
+    }
+
+    /* ─── RESET & BASE ──────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--ink);
+      color: var(--white);
+      min-height: 100vh;
+      padding-bottom: 40px;
+    }
+
+    /* ─── HEADER ────────────────────────────────────────── */
+    .app-header {
+      background: linear-gradient(160deg, #0f1623 0%, #1a2840 100%);
+      border-bottom: 1px solid var(--ink-mid);
+      padding: 20px 20px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      max-width: 540px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .app-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand-icon {
+      width: 40px; height: 40px;
+      background: linear-gradient(135deg, var(--green) 0%, #00a865 100%);
+      border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+      box-shadow: 0 0 16px rgba(0,201,122,0.4);
+    }
+    .brand-text h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: 0.01em;
+      line-height: 1.1;
+      color: var(--white);
+    }
+    .brand-text span {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--mist);
+      letter-spacing: 0.04em;
+    }
+    .header-date {
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .date-day {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 800;
+      line-height: 1;
+      color: var(--white);
+    }
+    .date-full {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--mist);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    /* ─── PROGRESS BANNER ───────────────────────────────── */
+    .progress-banner {
+      background: var(--ink-soft);
+      border-bottom: 1px solid var(--ink-mid);
+      padding: 14px 20px;
+    }
+    .progress-inner {
+      max-width: 540px;
+      margin: 0 auto;
+    }
+    .progress-labels {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .progress-label {
+      font-size: 0.78rem;
+      color: var(--mist);
+      font-weight: 500;
+    }
+    .progress-count {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--green);
+      font-weight: 500;
+    }
+    .progress-bar-track {
+      height: 6px;
+      background: var(--ink-mid);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--green-dark), var(--green));
+      border-radius: 99px;
+      transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      width: 0%;
+    }
+
+    /* ─── MAIN CONTENT ──────────────────────────────────── */
+    .content {
+      max-width: 540px;
+      margin: 0 auto;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ─── SHIFT SECTION ─────────────────────────────────── */
+    .shift-section {
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      box-shadow: var(--shadow-card);
+    }
+    .shift-header {
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .shift-header.start { background: var(--shift-start); }
+    .shift-header.end   { background: var(--shift-end); }
+    .shift-icon {
+      width: 36px; height: 36px;
+      border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .shift-icon.start { background: rgba(0,201,122,0.2); }
+    .shift-icon.end   { background: rgba(130,80,255,0.2); }
+    .shift-meta { flex: 1; }
+    .shift-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .shift-subtitle {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--fog);
+      opacity: 0.7;
+      margin-top: 1px;
+      letter-spacing: 0.04em;
+    }
+    .shift-badge {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.65rem;
+      padding: 4px 10px;
+      border-radius: 99px;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+    .shift-badge.start { background: rgba(0,201,122,0.2); color: var(--green); }
+    .shift-badge.end   { background: rgba(130,80,255,0.2); color: #c09bff; }
+
+    /* ─── TASK LIST ─────────────────────────────────────── */
+    .task-list {
+      background: var(--ink-soft);
+      display: flex;
+      flex-direction: column;
+    }
+    .task-item {
+      padding: 16px 18px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      transition: background 0.2s ease;
+    }
+    .task-item.done { background: rgba(0,201,122,0.04); }
+    .task-icon-wrap {
+      width: 38px; height: 38px;
+      border-radius: var(--radius-sm);
+      background: var(--ink-mid);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+      transition: background 0.3s ease;
+    }
+    .task-item.done .task-icon-wrap {
+      background: var(--green-glow);
+    }
+    .task-body { flex: 1; min-width: 0; }
+    .task-name {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--white);
+      line-height: 1.35;
+      transition: color 0.3s;
+    }
+    .task-item.done .task-name { color: var(--mist); }
+    .task-timestamp {
+      display: none;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--green);
+      margin-top: 4px;
+      letter-spacing: 0.04em;
+    }
+    .task-item.done .task-timestamp { display: block; }
+
+    /* ─── MARK DONE BUTTON ──────────────────────────────── */
+    .btn-done {
+      flex-shrink: 0;
+      padding: 10px 16px;
+      border: none;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, var(--green) 0%, #00a865 100%);
+      color: #003d25;
+      font-family: 'Syne', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: var(--shadow-btn);
+      white-space: nowrap;
+    }
+    .btn-done:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px rgba(0,201,122,0.45);
+    }
+    .btn-done:active:not(:disabled) {
+      transform: translateY(0);
+    }
+    .btn-done:disabled,
+    .btn-done.done-state {
+      background: var(--ink-mid);
+      color: var(--green);
+      box-shadow: none;
+      cursor: default;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.68rem;
+      letter-spacing: 0.02em;
+    }
+    .btn-done.loading-state {
+      background: var(--amber-bg);
+      color: var(--amber);
+      box-shadow: none;
+      cursor: not-allowed;
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.6; }
+    }
+
+    /* ─── TOAST NOTIFICATION ────────────────────────────── */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 999;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .toast {
+      background: var(--ink-soft);
+      border: 1px solid var(--ink-mid);
+      border-radius: var(--radius-md);
+      padding: 12px 20px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--white);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      animation: toast-in 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards;
+      max-width: 90vw;
+    }
+    .toast.success { border-color: var(--green); }
+    .toast.error   { border-color: var(--red); }
+    .toast.fade-out { animation: toast-out 0.3s ease forwards; }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(16px) scale(0.95); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes toast-out {
+      from { opacity: 1; transform: translateY(0) scale(1); }
+      to   { opacity: 0; transform: translateY(8px) scale(0.95); }
+    }
+
+    /* ─── CONFIG PANEL ──────────────────────────────────── */
+    .config-notice {
+      background: var(--amber-bg);
+      border: 1px solid rgba(245,166,35,0.3);
+      border-radius: var(--radius-lg);
+      padding: 16px 18px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .config-notice.hidden { display: none; }
+    .config-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+    .config-body h3 {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--amber);
+      margin-bottom: 6px;
+    }
+    .config-body p {
+      font-size: 0.78rem;
+      color: var(--fog);
+      line-height: 1.5;
+    }
+    .config-url-input {
+      width: 100%;
+      margin-top: 10px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(245,166,35,0.4);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--white);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .config-url-input::placeholder { color: var(--slate); }
+    .config-url-input:focus { border-color: var(--amber); }
+    .btn-save-url {
+      margin-top: 8px;
+      padding: 9px 18px;
+      background: var(--amber);
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: 'Syne', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: #3d2700;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      transition: opacity 0.2s;
+    }
+    .btn-save-url:hover { opacity: 0.85; }
+
+    /* ─── FOOTER ────────────────────────────────────────── */
+    .app-footer {
+      max-width: 540px;
+      margin: 0 auto;
+      padding: 8px 16px;
+      text-align: center;
+    }
+    .app-footer p {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.62rem;
+      color: var(--slate);
+      letter-spacing: 0.04em;
+    }
+
+    /* ─── COMPLETED SECTION GLOW ────────────────────────── */
+    .shift-section.all-done .shift-header.start,
+    .shift-section.all-done .shift-header.end {
+      background: var(--green-glow);
+    }
+    .shift-section.all-done .shift-badge {
+      background: var(--green-glow);
+      color: var(--green);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── HEADER ──────────────────────────────────────────── -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="app-brand">
+        <div class="brand-icon">📋</div>
+        <div class="brand-text">
+          <h1>Office Task<br>Tracker</h1>
+          <span>Daily Shift Log</span>
+        </div>
+      </div>
+      <div class="header-date">
+        <div class="date-day" id="dateDay">--</div>
+        <div class="date-full" id="dateFull">Loading...</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── PROGRESS ────────────────────────────────────────── -->
+  <div class="progress-banner">
+    <div class="progress-inner">
+      <div class="progress-labels">
+        <span class="progress-label">Today's Progress</span>
+        <span class="progress-count" id="progressCount">0 / 9 Done</span>
+      </div>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="progressBar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MAIN CONTENT ─────────────────────────────────────── -->
+  <main class="content">
+
+    <!-- CONFIG NOTICE (shown until URL is set) -->
+    <div class="config-notice" id="configNotice">
+      <div class="config-icon">⚙️</div>
+      <div class="config-body">
+        <h3>Google Sheets Not Connected</h3>
+        <p>Paste your Google Apps Script Web App URL below to enable data sync. Tasks still work offline without it.</p>
+        <input
+          class="config-url-input"
+          id="scriptUrlInput"
+          type="url"
+          placeholder="https://script.google.com/macros/s/YOUR_ID/exec"
+        />
+        <br/>
+        <button class="btn-save-url" onclick="saveScriptUrl()">Save & Connect</button>
+      </div>
+    </div>
+
+    <!-- START OF SHIFT -->
+    <section class="shift-section" id="section-start">
+      <div class="shift-header start">
+        <div class="shift-icon start">🌅</div>
+        <div class="shift-meta">
+          <div class="shift-title">Start of Shift</div>
+          <div class="shift-subtitle">Morning · Opening duties</div>
+        </div>
+        <div class="shift-badge start" id="badge-start">0/6</div>
+      </div>
+      <div class="task-list" id="list-start"></div>
+    </section>
+
+    <!-- END OF SHIFT -->
+    <section class="shift-section" id="section-end">
+      <div class="shift-header end">
+        <div class="shift-icon end">🌙</div>
+        <div class="shift-meta">
+          <div class="shift-title">End of Shift</div>
+          <div class="shift-subtitle">Evening · Closing duties</div>
+        </div>
+        <div class="shift-badge end" id="badge-end">0/3</div>
+      </div>
+      <div class="task-list" id="list-end"></div>
+    </section>
+
+  </main>
+
+  <!-- ── FOOTER ───────────────────────────────────────────── -->
+  <footer class="app-footer">
+    <p>Synced to Google Sheets · v1.0.0</p>
+  </footer>
+
+  <!-- ── TOASTS ────────────────────────────────────────────── -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    // ─── TASK DATA ────────────────────────────────────────────
+    const TASKS = {
+      start: [
+        { id: 'start-1', icon: '💡', name: 'Turn on all office lights (Entrance, Hallway, All Rooms)' },
+        { id: 'start-2', icon: '🚪', name: 'Clean main entrance door and walls' },
+        { id: 'start-3', icon: '🧹', name: 'Dusting (Rooms, Tables, Chairs, Decoration)' },
+        { id: 'start-4', icon: '🚽', name: 'Clean both toilets (Seats, Floor, Hair/Dirt check, Room freshener)' },
+        { id: 'start-5', icon: '🪑', name: 'Organize Furniture (Chairs, Tables, and other stuff in place)' },
+        { id: 'start-6', icon: '👟', name: 'Clean shoe rack' },
+      ],
+      end: [
+        { id: 'end-1', icon: '🔌', name: 'Turn off all electricity switches' },
+        { id: 'end-2', icon: '🔆', name: '4 PM Update: Turn off hallway lights and turn on hallway lamps' },
+        { id: 'end-3', icon: '✅', name: 'Final Check: All electronic appliances and switches off after employees leave' },
+      ]
+    };
+
+    // ─── STATE ────────────────────────────────────────────────
+    let scriptUrl = localStorage.getItem('office_script_url') || '';
+    const state   = {}; // taskId → { done: bool, timestamp: str }
+
+    // ─── INIT DATE ────────────────────────────────────────────
+    function initDate() {
+      const now = new Date();
+      const dayNum = now.getDate();
+      const monthStr = now.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+      const yearStr  = now.getFullYear();
+      const dayName  = now.toLocaleString('en-US', { weekday: 'long' }).toUpperCase();
+      document.getElementById('dateDay').textContent = dayNum;
+      document.getElementById('dateFull').textContent = `${dayName} · ${monthStr} ${yearStr}`;
+    }
+
+    // ─── RENDER TASKS ─────────────────────────────────────────
+    function renderTasks() {
+      ['start', 'end'].forEach(shift => {
+        const list = document.getElementById(`list-${shift}`);
+        list.innerHTML = '';
+        TASKS[shift].forEach(task => {
+          const s = state[task.id] || {};
+          const div = document.createElement('div');
+          div.className = `task-item${s.done ? ' done' : ''}`;
+          div.id = `task-item-${task.id}`;
+          div.innerHTML = `
+            <div class="task-icon-wrap">${task.icon}</div>
+            <div class="task-body">
+              <div class="task-name">${task.name}</div>
+              <div class="task-timestamp">${s.done ? '✓ Done at ' + s.timestamp : ''}</div>
+            </div>
+            <button
+              class="btn-done${s.done ? ' done-state' : ''}"
+              id="btn-${task.id}"
+              onclick="markDone('${task.id}', '${shift}', '${task.name.replace(/'/g, "\\'")}')"
+              ${s.done ? 'disabled' : ''}
+            >${s.done ? '✓ Done' : 'Mark Done'}</button>
+          `;
+          list.appendChild(div);
+        });
+      });
+      updateProgress();
+    }
+
+    // ─── MARK DONE ────────────────────────────────────────────
+    async function markDone(taskId, shift, taskName) {
+      const btn = document.getElementById(`btn-${taskId}`);
+      if (!btn || btn.disabled) return;
+
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+      // Optimistic UI
+      btn.textContent  = 'Saving…';
+      btn.className    = 'btn-done loading-state';
+      btn.disabled     = true;
+
+      // Save to state
+      state[taskId] = { done: true, timestamp: timeStr };
+
+      // Animate the row
+      const item = document.getElementById(`task-item-${taskId}`);
+      item.classList.add('done');
+      const ts = item.querySelector('.task-timestamp');
+      if (ts) { ts.textContent = `✓ Done at ${timeStr}`; ts.style.display = 'block'; }
+      const nameEl = item.querySelector('.task-name');
+      if (nameEl) nameEl.style.color = 'var(--mist)';
+
+      btn.textContent = '✓ Done';
+      btn.className   = 'btn-done done-state';
+
+      updateProgress();
+
+      // POST to Google Sheets
+      if (scriptUrl) {
+        try {
+          await postToSheets({ date: dateStr, taskName, shift, status: 'Done', timestamp: timeStr });
+          showToast(`✓ "${taskName.slice(0,28)}…" synced`, 'success');
+        } catch (e) {
+          showToast('⚠ Saved locally · Sheet sync failed', 'error');
+        }
+      } else {
+        showToast('✓ Marked done (not synced — no URL set)', 'success');
+      }
+    }
+
+    // ─── POST TO SHEETS ───────────────────────────────────────
+    async function postToSheets(payload) {
+      const resp = await fetch(scriptUrl, {
+        method: 'POST',
+        mode:   'no-cors',   // Apps Script requires no-cors for anonymous access
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      // no-cors → opaque response; we assume success if no network error
+    }
+
+    // ─── PROGRESS ─────────────────────────────────────────────
+    function updateProgress() {
+      const allTasks  = [...TASKS.start, ...TASKS.end];
+      const total     = allTasks.length;
+      const done      = allTasks.filter(t => state[t.id]?.done).length;
+      const pct       = Math.round((done / total) * 100);
+
+      document.getElementById('progressBar').style.width   = pct + '%';
+      document.getElementById('progressCount').textContent = `${done} / ${total} Done`;
+
+      // Update shift badges
+      ['start', 'end'].forEach(shift => {
+        const tasks   = TASKS[shift];
+        const doneN   = tasks.filter(t => state[t.id]?.done).length;
+        const badge   = document.getElementById(`badge-${shift}`);
+        const section = document.getElementById(`section-${shift}`);
+        badge.textContent = `${doneN}/${tasks.length}`;
+        if (doneN === tasks.length) section.classList.add('all-done');
+        else section.classList.remove('all-done');
+      });
+    }
+
+    // ─── CONFIG ───────────────────────────────────────────────
+    function initConfig() {
+      if (scriptUrl) {
+        document.getElementById('configNotice').classList.add('hidden');
+        document.getElementById('scriptUrlInput').value = scriptUrl;
+      }
+    }
+    function saveScriptUrl() {
+      const val = document.getElementById('scriptUrlInput').value.trim();
+      if (!val.startsWith('https://script.google.com')) {
+        showToast('⚠ Please enter a valid Apps Script URL', 'error');
+        return;
+      }
+      scriptUrl = val;
+      localStorage.setItem('office_script_url', scriptUrl);
+      document.getElementById('configNotice').classList.add('hidden');
+      showToast('✓ Google Sheets connected!', 'success');
+    }
+
+    // ─── TOAST ───────────────────────────────────────────────
+    function showToast(msg, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const el = document.createElement('div');
+      el.className = `toast ${type}`;
+      el.textContent = msg;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.classList.add('fade-out');
+        setTimeout(() => el.remove(), 300);
+      }, 3000);
+    }
+
+    // ─── BOOT ─────────────────────────────────────────────────
+    initDate();
+    initConfig();
+    renderTasks();
+  </script>
+</body>
+</html>
