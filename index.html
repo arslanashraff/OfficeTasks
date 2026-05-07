@@ -534,18 +534,83 @@
       ]
     };
 
-    // ─── STATE ────────────────────────────────────────────────
-    let scriptUrl = localStorage.getItem('office_script_url') || '';
-    const state   = {}; // taskId → { done: bool, timestamp: str }
+    // ─── CONSTANTS ────────────────────────────────────────────
+    const SHIFT_RESET_HOUR  = 4;          // New shift day starts at 4 AM
+    const LS_STATE_KEY      = 'office_task_state';   // localStorage key for task state
+    const LS_URL_KEY        = 'office_script_url';   // localStorage key for Apps Script URL
+
+    // ─── RUNTIME STATE ────────────────────────────────────────
+    let scriptUrl = localStorage.getItem(LS_URL_KEY) || '';
+    const state   = {};  // taskId → { done: bool, timestamp: str }
+
+    // ─── FIX 1: SHIFT DATE ────────────────────────────────────
+    // Returns the logical "shift date" as a Date object.
+    // Between midnight and 4 AM we are still on the PREVIOUS day's shift.
+    function getShiftDate() {
+      const now = new Date();
+      if (now.getHours() < SHIFT_RESET_HOUR) {
+        // Roll back to yesterday
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        return yesterday;
+      }
+      return now;
+    }
+
+    // Returns a stable "YYYY-MM-DD" string for the current shift date.
+    // Used as the localStorage key so state is scoped to exactly one shift.
+    function getShiftDateKey() {
+      const d = getShiftDate();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    // Returns a human-readable date string for display & Sheets logging.
+    function getShiftDateString() {
+      return getShiftDate().toLocaleDateString('en-US', {
+        year: 'numeric', month: 'long', day: 'numeric'
+      });
+    }
+
+    // ─── FIX 2: LOCALSTORAGE PERSISTENCE ─────────────────────
+    // Loads saved state from localStorage. If the stored shift date
+    // doesn't match today's shift date, the old data is discarded.
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(LS_STATE_KEY);
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        // Validate: only restore if it belongs to the current shift date
+        if (saved.shiftDateKey !== getShiftDateKey()) {
+          localStorage.removeItem(LS_STATE_KEY); // stale — clear it
+          return;
+        }
+        // Hydrate the runtime state object
+        Object.assign(state, saved.tasks || {});
+      } catch (e) {
+        localStorage.removeItem(LS_STATE_KEY); // corrupt data — clear it
+      }
+    }
+
+    // Persists the current state to localStorage, tagged with the shift date.
+    function saveState() {
+      const payload = {
+        shiftDateKey: getShiftDateKey(),
+        tasks: state
+      };
+      localStorage.setItem(LS_STATE_KEY, JSON.stringify(payload));
+    }
 
     // ─── INIT DATE ────────────────────────────────────────────
     function initDate() {
-      const now = new Date();
-      const dayNum = now.getDate();
-      const monthStr = now.toLocaleString('en-US', { month: 'short' }).toUpperCase();
-      const yearStr  = now.getFullYear();
-      const dayName  = now.toLocaleString('en-US', { weekday: 'long' }).toUpperCase();
-      document.getElementById('dateDay').textContent = dayNum;
+      const shiftDate = getShiftDate();   // ← use shift date, not raw Date()
+      const dayNum   = shiftDate.getDate();
+      const monthStr = shiftDate.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+      const yearStr  = shiftDate.getFullYear();
+      const dayName  = shiftDate.toLocaleString('en-US', { weekday: 'long' }).toUpperCase();
+      document.getElementById('dateDay').textContent  = dayNum;
       document.getElementById('dateFull').textContent = `${dayName} · ${monthStr} ${yearStr}`;
     }
 
@@ -583,17 +648,18 @@
       const btn = document.getElementById(`btn-${taskId}`);
       if (!btn || btn.disabled) return;
 
-      const now = new Date();
+      const now     = new Date();
       const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const dateStr = getShiftDateString(); // ← shift-aware date for Sheets
 
       // Optimistic UI
-      btn.textContent  = 'Saving…';
-      btn.className    = 'btn-done loading-state';
-      btn.disabled     = true;
+      btn.textContent = 'Saving…';
+      btn.className   = 'btn-done loading-state';
+      btn.disabled    = true;
 
-      // Save to state
+      // Update runtime state + persist to localStorage immediately
       state[taskId] = { done: true, timestamp: timeStr };
+      saveState(); // ← Fix 2: write to localStorage on every completion
 
       // Animate the row
       const item = document.getElementById(`task-item-${taskId}`);
@@ -612,7 +678,7 @@
       if (scriptUrl) {
         try {
           await postToSheets({ date: dateStr, taskName, shift, status: 'Done', timestamp: timeStr });
-          showToast(`✓ "${taskName.slice(0,28)}…" synced`, 'success');
+          showToast(`✓ "${taskName.slice(0, 28)}…" synced`, 'success');
         } catch (e) {
           showToast('⚠ Saved locally · Sheet sync failed', 'error');
         }
@@ -623,26 +689,25 @@
 
     // ─── POST TO SHEETS ───────────────────────────────────────
     async function postToSheets(payload) {
-      const resp = await fetch(scriptUrl, {
-        method: 'POST',
-        mode:   'no-cors',   // Apps Script requires no-cors for anonymous access
+      await fetch(scriptUrl, {
+        method:  'POST',
+        mode:    'no-cors', // Apps Script requires no-cors for anonymous access
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body:    JSON.stringify(payload),
       });
-      // no-cors → opaque response; we assume success if no network error
+      // no-cors → opaque response; we assume success if no network error thrown
     }
 
     // ─── PROGRESS ─────────────────────────────────────────────
     function updateProgress() {
-      const allTasks  = [...TASKS.start, ...TASKS.end];
-      const total     = allTasks.length;
-      const done      = allTasks.filter(t => state[t.id]?.done).length;
-      const pct       = Math.round((done / total) * 100);
+      const allTasks = [...TASKS.start, ...TASKS.end];
+      const total    = allTasks.length;
+      const done     = allTasks.filter(t => state[t.id]?.done).length;
+      const pct      = Math.round((done / total) * 100);
 
       document.getElementById('progressBar').style.width   = pct + '%';
       document.getElementById('progressCount').textContent = `${done} / ${total} Done`;
 
-      // Update shift badges
       ['start', 'end'].forEach(shift => {
         const tasks   = TASKS[shift];
         const doneN   = tasks.filter(t => state[t.id]?.done).length;
@@ -668,12 +733,12 @@
         return;
       }
       scriptUrl = val;
-      localStorage.setItem('office_script_url', scriptUrl);
+      localStorage.setItem(LS_URL_KEY, scriptUrl);
       document.getElementById('configNotice').classList.add('hidden');
       showToast('✓ Google Sheets connected!', 'success');
     }
 
-    // ─── TOAST ───────────────────────────────────────────────
+    // ─── TOAST ────────────────────────────────────────────────
     function showToast(msg, type = 'success') {
       const container = document.getElementById('toastContainer');
       const el = document.createElement('div');
@@ -687,9 +752,10 @@
     }
 
     // ─── BOOT ─────────────────────────────────────────────────
-    initDate();
+    loadState();   // Fix 2: restore persisted state BEFORE rendering
+    initDate();    // Fix 1: display uses shift-aware date
     initConfig();
-    renderTasks();
+    renderTasks(); // tasks render with restored done/pending states
   </script>
 </body>
 </html>
